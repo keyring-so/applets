@@ -47,6 +47,8 @@ public class KeycardApplet extends Applet {
   static final short CHAIN_CODE_SIZE = 32;
   static final short KEY_UID_LENGTH = 32;
   static final short BIP39_SEED_SIZE = CHAIN_CODE_SIZE * 2;
+  static final short PRIVATE_KEY_SIZE = 32;
+  static final short PUBLIC_KEY_SIZE = 32;
 
   static final byte GET_STATUS_P1_APPLICATION = 0x00;
   static final byte GET_STATUS_P1_KEY_PATH = 0x01;
@@ -129,6 +131,9 @@ public class KeycardApplet extends Applet {
   private byte[] chainCode;
   private boolean isExtended;
 
+  private byte[] ed25519MasterPrivate;
+  private byte[] ed25519MasterPublic;
+
   private byte[] tmpPath;
   private short tmpPathLen;
 
@@ -184,6 +189,9 @@ public class KeycardApplet extends Applet {
     masterChainCode = new byte[CHAIN_CODE_SIZE];
     altChainCode = new byte[CHAIN_CODE_SIZE];
     chainCode = masterChainCode;
+
+    ed25519MasterPrivate = new byte[PRIVATE_KEY_SIZE];
+    ed25519MasterPublic = new byte[PUBLIC_KEY_SIZE];
 
     keyPath = new byte[KEY_PATH_MAX_DEPTH * 4];
     pinlessPath = new byte[KEY_PATH_MAX_DEPTH * 4];
@@ -788,7 +796,12 @@ public class KeycardApplet extends Applet {
       ISOException.throwIt(ISO7816.SW_WRONG_DATA);
     }
 
+    byte[] apduBufferEd = new byte[BIP39_SEED_SIZE];
+    Util.arrayCopy(apduBuffer, ISO7816.OFFSET_CDATA, apduBufferEd, (short) 0, BIP39_SEED_SIZE);
+
     crypto.bip32MasterFromSeed(apduBuffer, (short) ISO7816.OFFSET_CDATA, BIP39_SEED_SIZE, apduBuffer, (short) ISO7816.OFFSET_CDATA);
+
+    crypto.slip10MasterFromSeed(Crypto.KEY_ED25519_SEED, apduBufferEd, (short) 0, BIP39_SEED_SIZE, apduBufferEd, (short) 0);
 
     JCSystem.beginTransaction();
     isExtended = true;
@@ -797,8 +810,10 @@ public class KeycardApplet extends Applet {
 
     Util.arrayCopy(apduBuffer, (short) (ISO7816.OFFSET_CDATA + CHAIN_CODE_SIZE), masterChainCode, (short) 0, CHAIN_CODE_SIZE);
     short pubLen = secp256k1.derivePublicKey(masterPrivate, apduBuffer, (short) 0);
-
     masterPublic.setW(apduBuffer, (short) 0, pubLen);
+
+    Util.arrayCopy(apduBufferEd, (short) 0, ed25519MasterPrivate, (short) 0, PRIVATE_KEY_SIZE);
+    Util.arrayCopy(apduBufferEd, (short) PRIVATE_KEY_SIZE, ed25519MasterPublic, (short) 0, PUBLIC_KEY_SIZE);
 
     resetKeyStatus();
     JCSystem.commitTransaction();
