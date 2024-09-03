@@ -117,7 +117,7 @@ public class Crypto {
    * @param keyOff the offset in the output buffer
    */
   void slip10MasterFromSeed(byte[] curveKey, byte[] seed, short seedOff, short seedSize, byte[] masterKey, short keyOff) {
-    hmacSHA512(curveKey, (short) 0, (short) KEY_BITCOIN_SEED.length, seed, seedOff, seedSize, masterKey, keyOff);
+    hmacSHA512(curveKey, (short) 0, (short) curveKey.length, seed, seedOff, seedSize, masterKey, keyOff);
   }
 
   /**
