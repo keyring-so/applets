@@ -27,6 +27,9 @@ public class KeycardApplet extends Applet {
   static final byte INS_EXPORT_KEY = (byte) 0xC2;
   static final byte INS_GET_DATA = (byte) 0xCA;
   static final byte INS_STORE_DATA = (byte) 0xE2;
+  static final byte INS_ED25519_SIGN_INIT = (byte) 0x30;
+  static final byte INS_ED25519_SIGN_UPDATE = (byte) 0x31;
+  static final byte INS_ED25519_SIGN_FINAL = (byte) 0x32;
 
   static final short SW_REFERENCED_DATA_NOT_FOUND = (short) 0x6A88;
 
@@ -48,6 +51,7 @@ public class KeycardApplet extends Applet {
   static final short KEY_UID_LENGTH = 32;
   static final short BIP39_SEED_SIZE = CHAIN_CODE_SIZE * 2;
   static final short PRIVATE_KEY_SIZE = 32;
+  static final short PUBLIC_KEY_SIZE = 32;
 
   static final byte GET_STATUS_P1_APPLICATION = 0x00;
   static final byte GET_STATUS_P1_KEY_PATH = 0x01;
@@ -150,6 +154,7 @@ public class KeycardApplet extends Applet {
 
   private Crypto crypto;
   private SECP256k1 secp256k1;
+  private Ed25519 ed25519;
 
   private byte[] derivationOutput;
 
@@ -181,6 +186,7 @@ public class KeycardApplet extends Applet {
   public KeycardApplet(byte[] bArray, short bOffset, byte bLength) {
     crypto = new Crypto();
     secp256k1 = new SECP256k1();
+    ed25519 = new Ed25519();
 
     uid = new byte[UID_LENGTH];
     crypto.random.generateData(uid, (short) 0, UID_LENGTH);
@@ -285,6 +291,14 @@ public class KeycardApplet extends Applet {
           break;
         case INS_SIGN:
           sign(apdu);
+          break;
+        case INS_ED25519_SIGN_INIT:
+          ed25519SignInit(apdu);
+          break;
+        case INS_ED25519_SIGN_UPDATE:
+          ed25519SignUpdate(apdu);
+        case INS_ED25519_SIGN_FINAL:
+          ed25519SignFinal(apdu);
           break;
         case INS_SET_PINLESS_PATH:
           setPinlessPath(apdu);
@@ -1255,7 +1269,7 @@ public class KeycardApplet extends Applet {
    *
    * @param apdu the JCRE-owned APDU object.
    */
-  private void ed25519Sign(APDU apdu) {
+  private void ed25519SignInit(APDU apdu) {
     byte[] apduBuffer = apdu.getBuffer();
     boolean usePinless = false;
     boolean makeCurrent = false;
@@ -1304,32 +1318,42 @@ public class KeycardApplet extends Applet {
 
     doSlip10Derive(apduBuffer, MessageDigest.LENGTH_SHA_256);
 
-    apduBuffer[SecureChannel.SC_OUT_OFFSET] = TLV_SIGNATURE_TEMPLATE;
-    apduBuffer[(short)(SecureChannel.SC_OUT_OFFSET + 3)] = TLV_PUB_KEY;
-    short outLen = apduBuffer[(short)(SecureChannel.SC_OUT_OFFSET + 4)] = Crypto.KEY_PUB_SIZE;
+    short off = SecureChannel.SC_OUT_OFFSET;
+    short outLen = PUBLIC_KEY_SIZE;
 
-    secp256k1.derivePublicKey(derivationOutput, (short) 0, apduBuffer, (short) (SecureChannel.SC_OUT_OFFSET + 5));
-
-    outLen += 5;
-    short sigOff = (short) (SecureChannel.SC_OUT_OFFSET + outLen);
-
-    signature.init(secp256k1.tmpECPrivateKey, Signature.MODE_SIGN);
-
-    outLen += signature.signPreComputedHash(apduBuffer, ISO7816.OFFSET_CDATA, MessageDigest.LENGTH_SHA_256, apduBuffer, sigOff);
-    outLen += crypto.fixS(apduBuffer, sigOff);
-
-    apduBuffer[(short)(SecureChannel.SC_OUT_OFFSET + 1)] = (byte) 0x81;
-    apduBuffer[(short)(SecureChannel.SC_OUT_OFFSET + 2)] = (byte) (outLen - 3);
+    byte[] privateKey = new byte[PRIVATE_KEY_SIZE];
+    Util.arrayCopy(derivationOutput, (short) 0, privateKey, (short) 0, PRIVATE_KEY_SIZE);
+    
+    ed25519.setKeypair(privateKey, apduBuffer, off);
+    ed25519.signInit();
 
     if (makeCurrent) {
       commitTmpPath();
     }
 
-    if (secureChannel.isOpen()) {
-      secureChannel.respond(apdu, outLen, ISO7816.SW_NO_ERROR);
-    } else {
-      apdu.setOutgoingAndSend(SecureChannel.SC_OUT_OFFSET, outLen);
-    }
+    secureChannel.respond(apdu, outLen, ISO7816.SW_NO_ERROR);
+  }
+
+  /**
+   * Processes the SIGN UPDATE command with ed25519 signature. Requires a secure channel to open and either the PIN to be verified or the PIN-less key
+   * path to be the current key path. This command supports signing  a precomputed 32-bytes hash. The signature is
+   * generated using the current keys, so if no keys are loaded the command does not work.
+   *
+   * @param apdu the JCRE-owned APDU object.
+   */
+  private void ed25519SignUpdate(APDU apdu) {
+
+  }
+
+  /**
+   * Processes the SIGN FINALIZE command with ed25519 signature. Requires a secure channel to open and either the PIN to be verified or the PIN-less key
+   * path to be the current key path. This command supports signing  a precomputed 32-bytes hash. The signature is
+   * generated using the current keys, so if no keys are loaded the command does not work.
+   *
+   * @param apdu the JCRE-owned APDU object.
+   */
+  private void ed25519SignFinal(APDU apdu) {
+
   }
 
   /**
