@@ -295,11 +295,12 @@ public class KeycardApplet extends Applet {
         case INS_ED25519_SIGN_INIT:
           ed25519SignInit(apdu);
           break;
-        case INS_ED25519_SIGN_UPDATE:
-          ed25519SignUpdate(apdu);
-        case INS_ED25519_SIGN_FINAL:
-          ed25519SignFinal(apdu);
-          break;
+        // case INS_ED25519_SIGN_UPDATE:
+        //   ed25519SignUpdate(apdu);
+        //   break;
+        // case INS_ED25519_SIGN_FINAL:
+        //   ed25519SignFinal(apdu);
+        //   break;
         case INS_SET_PINLESS_PATH:
           setPinlessPath(apdu);
           break;
@@ -1334,7 +1335,11 @@ public class KeycardApplet extends Applet {
       commitTmpPath();
     }
 
-    secureChannel.respond(apdu, outLen, ISO7816.SW_NO_ERROR);
+    if (secureChannel.isOpen()) {
+      secureChannel.respond(apdu, outLen, ISO7816.SW_NO_ERROR);
+    } else {
+      apdu.setOutgoingAndSend(SecureChannel.SC_OUT_OFFSET, outLen);
+    }
   }
 
   /**
@@ -1344,9 +1349,9 @@ public class KeycardApplet extends Applet {
    *
    * @param apdu the JCRE-owned APDU object.
    */
-  private void ed25519SignUpdate(APDU apdu) {
+  // private void ed25519SignUpdate(APDU apdu) {
 
-  }
+  // }
 
   /**
    * Processes the SIGN FINALIZE command with ed25519 signature. Requires a secure channel to open and either the PIN to be verified or the PIN-less key
@@ -1355,9 +1360,9 @@ public class KeycardApplet extends Applet {
    *
    * @param apdu the JCRE-owned APDU object.
    */
-  private void ed25519SignFinal(APDU apdu) {
+  // private void ed25519SignFinal(APDU apdu) {
 
-  }
+  // }
 
   /**
    * Processes the SET PINLESS PATH command. Requires an open secure channel and the PIN to be verified. It does not

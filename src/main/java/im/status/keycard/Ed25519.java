@@ -88,11 +88,11 @@ public class Ed25519 {
         Util.arrayCopyNonAtomic(publicKey, (short) 0, apduBuffer, (short) offset, (short) 32);
     }
 
-    private void setPublicKey(APDU apdu) {
-        byte[] apduBuffer = apdu.getBuffer();
-        Util.arrayCopyNonAtomic(apduBuffer, ISO7816.OFFSET_CDATA, publicKey, (short) 0, (short) publicKey.length);
-        apdu.setOutgoing();
-    }
+    // private void setPublicKey(APDU apdu) {
+    //     byte[] apduBuffer = apdu.getBuffer();
+    //     Util.arrayCopyNonAtomic(apduBuffer, ISO7816.OFFSET_CDATA, publicKey, (short) 0, (short) publicKey.length);
+    //     apdu.setOutgoing();
+    // }
 
     public void signInit() {
         // Generate nonce R
@@ -107,14 +107,14 @@ public class Ed25519 {
         hasher.update(publicKey, (short) 0, curve.COORD_SIZE); // A
     }
 
-    private void signNonce(APDU apdu) {
-        byte[] apduBuffer = apdu.getBuffer();
-        hasher.reset();
-        Util.arrayCopyNonAtomic(apduBuffer, ISO7816.OFFSET_CDATA, publicNonce, (short) 0, curve.COORD_SIZE);
-        hasher.update(apduBuffer, ISO7816.OFFSET_CDATA, curve.COORD_SIZE); // R
-        hasher.update(publicKey, (short) 0, curve.COORD_SIZE); // A
-        apdu.setOutgoing();
-    }
+    // private void signNonce(APDU apdu) {
+    //     byte[] apduBuffer = apdu.getBuffer();
+    //     hasher.reset();
+    //     Util.arrayCopyNonAtomic(apduBuffer, ISO7816.OFFSET_CDATA, publicNonce, (short) 0, curve.COORD_SIZE);
+    //     hasher.update(apduBuffer, ISO7816.OFFSET_CDATA, curve.COORD_SIZE); // R
+    //     hasher.update(publicKey, (short) 0, curve.COORD_SIZE); // A
+    //     apdu.setOutgoing();
+    // }
 
     public void signFinalize(byte[] apduBuffer, short off) {
         hasher.doFinal(apduBuffer, ISO7816.OFFSET_CDATA, MessageDigest.LENGTH_SHA_256, apduBuffer, (short) off); // m
@@ -133,12 +133,12 @@ public class Ed25519 {
         changeEndianity(apduBuffer, (short) (curve.COORD_SIZE + off), curve.COORD_SIZE);
     }
 
-    private void signUpdate(APDU apdu) {
-        byte[] apduBuffer = apdu.getBuffer();
-        short len = (short) ((short) apduBuffer[ISO7816.OFFSET_P1] & (short) 0xff);
-        hasher.update(apduBuffer, ISO7816.OFFSET_CDATA, len);
-        apdu.setOutgoing();
-    }
+    // private void signUpdate(APDU apdu) {
+    //     byte[] apduBuffer = apdu.getBuffer();
+    //     short len = (short) ((short) apduBuffer[ISO7816.OFFSET_P1] & (short) 0xff);
+    //     hasher.update(apduBuffer, ISO7816.OFFSET_CDATA, len);
+    //     apdu.setOutgoing();
+    // }
 
     private void encodeEd25519(ECPoint point, byte[] buffer, short offset) {
         point.getW(ramArray, (short) 0);
@@ -178,15 +178,15 @@ public class Ed25519 {
     }
 
     // CAN BE USED ONLY IF NO OFFLOADING IS USED; OTHERWISE INSECURE!
-    private void deterministicNonce(byte[] msg, short offset, short len) {
-        hasher.reset();
-        hasher.update(prefix, (short) 0, (short) 32);
-        hasher.doFinal(msg, offset, len, ramArray, (short) 0);
-        changeEndianity(ramArray, (short) 0, (short) 64);
-        privateNonce.fromByteArray(ramArray, (short) 0, (short) 64);
-        privateNonce.mod(curve.rBN);
-        privateNonce.resize((short) 32);
-    }
+    // private void deterministicNonce(byte[] msg, short offset, short len) {
+    //     hasher.reset();
+    //     hasher.update(prefix, (short) 0, (short) 32);
+    //     hasher.doFinal(msg, offset, len, ramArray, (short) 0);
+    //     changeEndianity(ramArray, (short) 0, (short) 64);
+    //     privateNonce.fromByteArray(ramArray, (short) 0, (short) 64);
+    //     privateNonce.mod(curve.rBN);
+    //     privateNonce.resize((short) 32);
+    // }
 
     public void randomNonce() {
         random.generateData(ramArray, (short) 0, (short) 32);
