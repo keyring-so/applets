@@ -15,7 +15,7 @@ public class Ed25519 {
 
 
     private ResourceManager rm;
-    private ECCurve curve;
+    public ECCurve curve;
     private BigNat privateKey, privateNonce, signature;
     private BigNat transformC, transformA3, transformX, transformY, eight;
     private ECPoint point;
@@ -116,12 +116,10 @@ public class Ed25519 {
         apdu.setOutgoing();
     }
 
-    private void signFinalize(APDU apdu) {
-        byte[] apduBuffer = apdu.getBuffer();
-        short len = (short) ((short) apduBuffer[ISO7816.OFFSET_P1] & (short) 0xff);
-        hasher.doFinal(apduBuffer, ISO7816.OFFSET_CDATA, len, apduBuffer, (short) 0); // m
-        changeEndianity(apduBuffer, (short) 0, (short) 64);
-        signature.fromByteArray(apduBuffer, (short) 0, (short) 64);
+    public void signFinalize(byte[] apduBuffer, short off) {
+        hasher.doFinal(apduBuffer, ISO7816.OFFSET_CDATA, MessageDigest.LENGTH_SHA_256, apduBuffer, (short) off); // m
+        changeEndianity(apduBuffer, (short) off, (short) 64);
+        signature.fromByteArray(apduBuffer, (short) off, (short) 64);
         signature.mod(curve.rBN);
         signature.resize((short) 32);
 
@@ -130,10 +128,9 @@ public class Ed25519 {
         signature.modAdd(privateNonce, curve.rBN);
 
         // Return signature (R, s)
-        Util.arrayCopyNonAtomic(publicNonce, (short) 0, apduBuffer, (short) 0, curve.COORD_SIZE);
-        signature.prependZeros(curve.COORD_SIZE, apduBuffer, curve.COORD_SIZE);
-        changeEndianity(apduBuffer, curve.COORD_SIZE, curve.COORD_SIZE);
-        apdu.setOutgoingAndSend((short) 0, (short) (curve.COORD_SIZE + curve.COORD_SIZE));
+        Util.arrayCopyNonAtomic(publicNonce, (short) 0, apduBuffer, (short) off, curve.COORD_SIZE);
+        signature.prependZeros(curve.COORD_SIZE, apduBuffer, (short) (curve.COORD_SIZE + off));
+        changeEndianity(apduBuffer, (short) (curve.COORD_SIZE + off), curve.COORD_SIZE);
     }
 
     private void signUpdate(APDU apdu) {

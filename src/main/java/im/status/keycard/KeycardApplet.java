@@ -1319,13 +1319,16 @@ public class KeycardApplet extends Applet {
     doSlip10Derive(apduBuffer, MessageDigest.LENGTH_SHA_256);
 
     short off = SecureChannel.SC_OUT_OFFSET;
-    short outLen = PUBLIC_KEY_SIZE;
 
     byte[] privateKey = new byte[PRIVATE_KEY_SIZE];
     Util.arrayCopy(derivationOutput, (short) 0, privateKey, (short) 0, PRIVATE_KEY_SIZE);
     
     ed25519.setKeypair(privateKey, apduBuffer, off);
     ed25519.signInit();
+
+    ed25519.signFinalize(apduBuffer, (short) (off + 32));
+
+    short outLen = (short) (PUBLIC_KEY_SIZE +  ed25519.curve.COORD_SIZE + ed25519.curve.COORD_SIZE);
 
     if (makeCurrent) {
       commitTmpPath();
