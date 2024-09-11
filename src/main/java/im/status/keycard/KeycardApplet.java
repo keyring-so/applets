@@ -27,6 +27,9 @@ public class KeycardApplet extends Applet {
   static final byte INS_EXPORT_KEY = (byte) 0xC2;
   static final byte INS_GET_DATA = (byte) 0xCA;
   static final byte INS_STORE_DATA = (byte) 0xE2;
+  static final byte INS_ED25519_SIGN_INIT = (byte) 0x30;
+  static final byte INS_ED25519_SIGN_UPDATE = (byte) 0x31;
+  static final byte INS_ED25519_SIGN_FINAL = (byte) 0x32;
 
   static final short SW_REFERENCED_DATA_NOT_FOUND = (short) 0x6A88;
 
@@ -47,6 +50,8 @@ public class KeycardApplet extends Applet {
   static final short CHAIN_CODE_SIZE = 32;
   static final short KEY_UID_LENGTH = 32;
   static final short BIP39_SEED_SIZE = CHAIN_CODE_SIZE * 2;
+  static final short PRIVATE_KEY_SIZE = 32;
+  static final short PUBLIC_KEY_SIZE = 32;
 
   static final byte GET_STATUS_P1_APPLICATION = 0x00;
   static final byte GET_STATUS_P1_KEY_PATH = 0x01;
@@ -129,6 +134,11 @@ public class KeycardApplet extends Applet {
   private byte[] chainCode;
   private boolean isExtended;
 
+  private byte[] ed25519MasterPrivate;
+  private byte[] ed25519MasterChainCode;
+  private byte[] ed25519TmpPrivate;
+  private byte[] ed25519TmpChainCode;
+
   private byte[] tmpPath;
   private short tmpPathLen;
 
@@ -144,6 +154,7 @@ public class KeycardApplet extends Applet {
 
   private Crypto crypto;
   private SECP256k1 secp256k1;
+  private Ed25519 ed25519;
 
   private byte[] derivationOutput;
 
@@ -175,6 +186,7 @@ public class KeycardApplet extends Applet {
   public KeycardApplet(byte[] bArray, short bOffset, byte bLength) {
     crypto = new Crypto();
     secp256k1 = new SECP256k1();
+    ed25519 = new Ed25519();
 
     uid = new byte[UID_LENGTH];
     crypto.random.generateData(uid, (short) 0, UID_LENGTH);
@@ -184,6 +196,11 @@ public class KeycardApplet extends Applet {
     masterChainCode = new byte[CHAIN_CODE_SIZE];
     altChainCode = new byte[CHAIN_CODE_SIZE];
     chainCode = masterChainCode;
+
+    ed25519MasterPrivate = new byte[PRIVATE_KEY_SIZE];
+    ed25519MasterChainCode = new byte[CHAIN_CODE_SIZE];
+    ed25519TmpPrivate = new byte[PRIVATE_KEY_SIZE];
+    ed25519TmpChainCode = new byte[CHAIN_CODE_SIZE];
 
     keyPath = new byte[KEY_PATH_MAX_DEPTH * 4];
     pinlessPath = new byte[KEY_PATH_MAX_DEPTH * 4];
@@ -275,6 +292,15 @@ public class KeycardApplet extends Applet {
         case INS_SIGN:
           sign(apdu);
           break;
+        case INS_ED25519_SIGN_INIT:
+          ed25519SignInit(apdu);
+          break;
+        // case INS_ED25519_SIGN_UPDATE:
+        //   ed25519SignUpdate(apdu);
+        //   break;
+        // case INS_ED25519_SIGN_FINAL:
+        //   ed25519SignFinal(apdu);
+        //   break;
         case INS_SET_PINLESS_PATH:
           setPinlessPath(apdu);
           break;
@@ -788,7 +814,12 @@ public class KeycardApplet extends Applet {
       ISOException.throwIt(ISO7816.SW_WRONG_DATA);
     }
 
+    byte[] apduBufferEd = new byte[BIP39_SEED_SIZE];
+    Util.arrayCopy(apduBuffer, ISO7816.OFFSET_CDATA, apduBufferEd, (short) 0, BIP39_SEED_SIZE);
+
     crypto.bip32MasterFromSeed(apduBuffer, (short) ISO7816.OFFSET_CDATA, BIP39_SEED_SIZE, apduBuffer, (short) ISO7816.OFFSET_CDATA);
+
+    crypto.slip10MasterFromSeed(Crypto.KEY_ED25519_SEED, apduBufferEd, (short) 0, BIP39_SEED_SIZE, apduBufferEd, (short) 0);
 
     JCSystem.beginTransaction();
     isExtended = true;
@@ -797,8 +828,10 @@ public class KeycardApplet extends Applet {
 
     Util.arrayCopy(apduBuffer, (short) (ISO7816.OFFSET_CDATA + CHAIN_CODE_SIZE), masterChainCode, (short) 0, CHAIN_CODE_SIZE);
     short pubLen = secp256k1.derivePublicKey(masterPrivate, apduBuffer, (short) 0);
-
     masterPublic.setW(apduBuffer, (short) 0, pubLen);
+
+    Util.arrayCopy(apduBufferEd, (short) 0, ed25519MasterPrivate, (short) 0, PRIVATE_KEY_SIZE);
+    Util.arrayCopy(apduBufferEd, (short) PRIVATE_KEY_SIZE, ed25519MasterChainCode, (short) 0, CHAIN_CODE_SIZE);
 
     resetKeyStatus();
     JCSystem.commitTransaction();
@@ -933,6 +966,52 @@ public class KeycardApplet extends Applet {
 
       if (!crypto.bip32CKDPriv(tmpPath, i, apduBuffer, scratchOff, apduBuffer, dataOff, derivationOutput, (short) 0)) {
         ISOException.throwIt(ISO7816.SW_DATA_INVALID);
+      }
+    }
+  }
+
+  /**
+   * Internal derivation function for SLIP-10, called by DERIVE KEY and EXPORT KEY
+   * @param apduBuffer the APDU buffer
+   * @param off the offset in the APDU buffer relative to the data field
+   */
+  private void doSlip10Derive(byte[] apduBuffer, short off) {
+    if (tmpPathLen == 0) {
+      Util.arrayCopy(ed25519MasterPrivate, (short) 0, derivationOutput, (short) 0, PRIVATE_KEY_SIZE);
+      return;
+    }
+
+    short scratchOff = (short) (ISO7816.OFFSET_CDATA + off);
+    short dataOff = (short) (scratchOff + Crypto.KEY_DERIVATION_SCRATCH_SIZE);
+
+    short pubKeyOff = (short) (dataOff + masterPrivate.getS(apduBuffer, dataOff));
+    pubKeyOff = Util.arrayCopyNonAtomic(chainCode, (short) 0, apduBuffer, pubKeyOff, CHAIN_CODE_SIZE);
+
+    if (!crypto.bip32IsHardened(tmpPath, (short) 0)) {
+      masterPublic.getW(apduBuffer, pubKeyOff);
+    } else {
+      apduBuffer[pubKeyOff] = 0;
+    }
+
+    byte[] dataTmp = new byte[Crypto.KEY_DERIVATION_SCRATCH_SIZE];
+    dataTmp[0] = 0;
+    Util.arrayCopy(ed25519MasterPrivate, (short) 0, dataTmp, (short) 1, PRIVATE_KEY_SIZE);
+    Util.arrayCopy(tmpPath, (short) 0, dataTmp, (short) (PRIVATE_KEY_SIZE + 1), (short) 4);
+
+    crypto.slip10MasterFromSeed(ed25519MasterChainCode, dataTmp, (short) 0, (short) dataTmp.length, derivationOutput, (short) 0);
+    
+    Util.arrayCopy(derivationOutput, (short) 0, ed25519TmpPrivate, (short) 0, PRIVATE_KEY_SIZE);
+    Util.arrayCopy(derivationOutput, (short) PRIVATE_KEY_SIZE, ed25519TmpChainCode, (short) 0, CHAIN_CODE_SIZE);
+
+    for (short i = 0; i < tmpPathLen; i += 4) {
+      if (i > 0) {
+        Util.arrayCopy(ed25519TmpPrivate, (short) 0, dataTmp, (short) 1, PRIVATE_KEY_SIZE);
+        Util.arrayCopy(tmpPath, (short) i, dataTmp, (short) (PRIVATE_KEY_SIZE + 1), (short) 4);
+
+        crypto.slip10MasterFromSeed(ed25519TmpChainCode, dataTmp, (short) 0, (short) dataTmp.length, derivationOutput, (short) 0);
+        
+        Util.arrayCopy(derivationOutput, (short) 0, ed25519TmpPrivate, (short) 0, PRIVATE_KEY_SIZE);
+        Util.arrayCopy(derivationOutput, (short) PRIVATE_KEY_SIZE, ed25519TmpChainCode, (short) 0, CHAIN_CODE_SIZE);
       }
     }
   }
@@ -1183,6 +1262,107 @@ public class KeycardApplet extends Applet {
       apdu.setOutgoingAndSend(SecureChannel.SC_OUT_OFFSET, outLen);
     }
   }
+
+  /**
+   * Processes the SIGN command with ed25519 signature. Requires a secure channel to open and either the PIN to be verified or the PIN-less key
+   * path to be the current key path. This command supports signing  a precomputed 32-bytes hash. The signature is
+   * generated using the current keys, so if no keys are loaded the command does not work.
+   *
+   * @param apdu the JCRE-owned APDU object.
+   */
+  private void ed25519SignInit(APDU apdu) {
+    byte[] apduBuffer = apdu.getBuffer();
+    boolean usePinless = false;
+    boolean makeCurrent = false;
+    byte derivationSource = (byte) (apduBuffer[OFFSET_P1] & DERIVE_P1_SOURCE_MASK);
+
+    switch((byte) (apduBuffer[OFFSET_P1] & ~DERIVE_P1_SOURCE_MASK)) {
+      case SIGN_P1_CURRENT_KEY:
+        derivationSource = DERIVE_P1_SOURCE_CURRENT;
+        break;
+      case SIGN_P1_DERIVE:
+        break;
+      case SIGN_P1_DERIVE_AND_MAKE_CURRENT:
+        makeCurrent = true;
+        break;
+      case SIGN_P1_PINLESS:
+        usePinless = true;
+        derivationSource = DERIVE_P1_SOURCE_PINLESS;
+        break;
+      default:
+        ISOException.throwIt(ISO7816.SW_WRONG_P1P2);
+        return;
+    }
+
+    short len;
+
+    if (usePinless && !secureChannel.isOpen()) {
+      len = (short) (apduBuffer[ISO7816.OFFSET_LC] & (short) 0xff);
+    } else {
+      len = secureChannel.preprocessAPDU(apduBuffer);
+    }
+
+    if (usePinless && pinlessPathLen == 0) {
+      ISOException.throwIt(SW_REFERENCED_DATA_NOT_FOUND);
+    }
+
+    if (len < MessageDigest.LENGTH_SHA_256) {
+      ISOException.throwIt(ISO7816.SW_WRONG_DATA);
+    }
+
+    short pathLen = (short) (len - MessageDigest.LENGTH_SHA_256);
+    updateDerivationPath(apduBuffer, MessageDigest.LENGTH_SHA_256, pathLen, derivationSource);
+
+    if (!((pin.isValidated() || usePinless || isPinless()) && masterPrivate.isInitialized())) {
+      ISOException.throwIt(ISO7816.SW_CONDITIONS_NOT_SATISFIED);
+    }
+
+    doSlip10Derive(apduBuffer, MessageDigest.LENGTH_SHA_256);
+
+    short off = SecureChannel.SC_OUT_OFFSET;
+
+    byte[] privateKey = new byte[PRIVATE_KEY_SIZE];
+    Util.arrayCopy(derivationOutput, (short) 0, privateKey, (short) 0, PRIVATE_KEY_SIZE);
+    
+    ed25519.setKeypair(privateKey, apduBuffer, off);
+    ed25519.signInit();
+
+    ed25519.signFinalize(apduBuffer, (short) (off + 32));
+
+    short outLen = (short) (PUBLIC_KEY_SIZE +  ed25519.curve.COORD_SIZE + ed25519.curve.COORD_SIZE);
+
+    if (makeCurrent) {
+      commitTmpPath();
+    }
+
+    if (secureChannel.isOpen()) {
+      secureChannel.respond(apdu, outLen, ISO7816.SW_NO_ERROR);
+    } else {
+      apdu.setOutgoingAndSend(SecureChannel.SC_OUT_OFFSET, outLen);
+    }
+  }
+
+  /**
+   * Processes the SIGN UPDATE command with ed25519 signature. Requires a secure channel to open and either the PIN to be verified or the PIN-less key
+   * path to be the current key path. This command supports signing  a precomputed 32-bytes hash. The signature is
+   * generated using the current keys, so if no keys are loaded the command does not work.
+   *
+   * @param apdu the JCRE-owned APDU object.
+   */
+  // private void ed25519SignUpdate(APDU apdu) {
+
+  // }
+
+  /**
+   * Processes the SIGN FINALIZE command with ed25519 signature. Requires a secure channel to open and either the PIN to be verified or the PIN-less key
+   * path to be the current key path. This command supports signing  a precomputed 32-bytes hash. The signature is
+   * generated using the current keys, so if no keys are loaded the command does not work.
+   *
+   * @param apdu the JCRE-owned APDU object.
+   */
+  // private void ed25519SignFinal(APDU apdu) {
+
+  // }
 
   /**
    * Processes the SET PINLESS PATH command. Requires an open secure channel and the PIN to be verified. It does not

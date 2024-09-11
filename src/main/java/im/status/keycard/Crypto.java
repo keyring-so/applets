@@ -25,6 +25,7 @@ public class Crypto {
   final static private short HMAC_BLOCK_SIZE = (short) 128;
 
   final static private byte[] KEY_BITCOIN_SEED = {'B', 'i', 't', 'c', 'o', 'i', 'n', ' ', 's', 'e', 'e', 'd'};
+  final static public byte[] KEY_ED25519_SEED = {'e', 'd', '2', '5', '5', '1', '9', ' ', 's', 'e', 'e', 'd'};
 
   // The below 5 objects can be accessed anywhere from the entire applet
   RandomData random;
@@ -103,6 +104,20 @@ public class Crypto {
    */
   void bip32MasterFromSeed(byte[] seed, short seedOff, short seedSize, byte[] masterKey, short keyOff) {
     hmacSHA512(KEY_BITCOIN_SEED, (short) 0, (short) KEY_BITCOIN_SEED.length, seed, seedOff, seedSize, masterKey, keyOff);
+  }
+
+  /**
+   * Applies the algorithm for master key derivation defined by SLIP-10 to the binary seed provided as input.
+   *
+   * @param curveKey the key used for hmac512
+   * @param seed the binary seed
+   * @param seedOff the offset of the binary seed
+   * @param seedSize the size of the binary seed
+   * @param masterKey the output buffer
+   * @param keyOff the offset in the output buffer
+   */
+  void slip10MasterFromSeed(byte[] curveKey, byte[] seed, short seedOff, short seedSize, byte[] masterKey, short keyOff) {
+    hmacSHA512(curveKey, (short) 0, (short) curveKey.length, seed, seedOff, seedSize, masterKey, keyOff);
   }
 
   /**
