@@ -116,8 +116,8 @@ public class Ed25519 {
     //     apdu.setOutgoing();
     // }
 
-    public void signFinalize(byte[] apduBuffer, short off) {
-        hasher.doFinal(apduBuffer, ISO7816.OFFSET_CDATA, MessageDigest.LENGTH_SHA_256, apduBuffer, (short) off); // m
+    public void signFinalize(byte[] apduBuffer, short len, short off) {
+        hasher.doFinal(apduBuffer, ISO7816.OFFSET_CDATA, len, apduBuffer, (short) off); // m
         changeEndianity(apduBuffer, (short) off, (short) 64);
         signature.fromByteArray(apduBuffer, (short) off, (short) 64);
         signature.mod(curve.rBN);
