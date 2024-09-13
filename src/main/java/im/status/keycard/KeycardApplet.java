@@ -1147,31 +1147,37 @@ public class KeycardApplet extends Applet {
       ISOException.throwIt(ISO7816.SW_WRONG_DATA);
     }
 
-    short pathLen = (short) (len - MessageDigest.LENGTH_SHA_256);
-    updateDerivationPath(apduBuffer, MessageDigest.LENGTH_SHA_256, pathLen, derivationSource);
+    short pathLen = (short) (len - len);
+    updateDerivationPath(apduBuffer, len, pathLen, derivationSource);
 
     if (!((pin.isValidated() || usePinless || isPinless()) && masterPrivate.isInitialized())) {
       ISOException.throwIt(ISO7816.SW_CONDITIONS_NOT_SATISFIED);
     }
 
-    doDerive(apduBuffer, MessageDigest.LENGTH_SHA_256);
+    doDerive(apduBuffer, len);
 
-    apduBuffer[SecureChannel.SC_OUT_OFFSET] = TLV_SIGNATURE_TEMPLATE;
-    apduBuffer[(short)(SecureChannel.SC_OUT_OFFSET + 3)] = TLV_PUB_KEY;
-    short outLen = apduBuffer[(short)(SecureChannel.SC_OUT_OFFSET + 4)] = Crypto.KEY_PUB_SIZE;
+    final short scOutOff = (short) (ISO7816.OFFSET_CDATA + len);
 
-    secp256k1.derivePublicKey(derivationOutput, (short) 0, apduBuffer, (short) (SecureChannel.SC_OUT_OFFSET + 5));
+    apduBuffer[scOutOff] = TLV_SIGNATURE_TEMPLATE;
+    apduBuffer[(short)(scOutOff + 3)] = TLV_PUB_KEY;
+    short outLen = apduBuffer[(short)(scOutOff + 4)] = Crypto.KEY_PUB_SIZE;
+
+    secp256k1.derivePublicKey(derivationOutput, (short) 0, apduBuffer, (short) (scOutOff + 5));
 
     outLen += 5;
-    short sigOff = (short) (SecureChannel.SC_OUT_OFFSET + outLen);
+    short sigOff = (short) (scOutOff + outLen);
 
     signature.init(secp256k1.tmpECPrivateKey, Signature.MODE_SIGN);
 
-    outLen += signature.signPreComputedHash(apduBuffer, ISO7816.OFFSET_CDATA, MessageDigest.LENGTH_SHA_256, apduBuffer, sigOff);
+    if (len == MessageDigest.LENGTH_SHA_256) {
+      outLen += signature.signPreComputedHash(apduBuffer, ISO7816.OFFSET_CDATA, MessageDigest.LENGTH_SHA_256, apduBuffer, sigOff);
+    } else {
+      outLen += signature.sign(apduBuffer, ISO7816.OFFSET_CDATA, len, apduBuffer, sigOff);
+    }
     outLen += crypto.fixS(apduBuffer, sigOff);
 
-    apduBuffer[(short)(SecureChannel.SC_OUT_OFFSET + 1)] = (byte) 0x81;
-    apduBuffer[(short)(SecureChannel.SC_OUT_OFFSET + 2)] = (byte) (outLen - 3);
+    apduBuffer[(short)(scOutOff + 1)] = (byte) 0x81;
+    apduBuffer[(short)(scOutOff + 2)] = (byte) (outLen - 3);
 
     if (makeCurrent) {
       commitTmpPath();
@@ -1180,7 +1186,7 @@ public class KeycardApplet extends Applet {
     if (secureChannel.isOpen()) {
       secureChannel.respond(apdu, outLen, ISO7816.SW_NO_ERROR);
     } else {
-      apdu.setOutgoingAndSend(SecureChannel.SC_OUT_OFFSET, outLen);
+      apdu.setOutgoingAndSend(scOutOff, outLen);
     }
   }
 
