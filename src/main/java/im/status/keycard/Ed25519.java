@@ -64,7 +64,7 @@ public class Ed25519 {
         return true;
     }
 
-    public void setKeypair(byte[] masterKeyParam, byte[] apduBuffer, short offset) {
+    public void setKeypair(byte[] masterKeyParam) {
         hasher.reset();
         hasher.doFinal(masterKeyParam, (short) 0, (short) 32, ramArray, (short) 0);
         ramArray[0] &= (byte) 0xf8; // Clear lowest three bits
@@ -84,7 +84,9 @@ public class Ed25519 {
         point.multiplication(eight); // Compensate bit shift
 
         encodeEd25519(point, publicKey, (short) 0);
+    }
 
+    public void copyPubkey(byte[] apduBuffer, short offset) {
         Util.arrayCopyNonAtomic(publicKey, (short) 0, apduBuffer, (short) offset, (short) 32);
     }
 
