@@ -1,4 +1,4 @@
-package im.status.keycard;
+package so.keyring.card;
 
 import javacard.framework.*;
 import javacard.security.*;
@@ -48,7 +48,7 @@ public class SecureChannel {
    * Instantiates a Secure Channel. All memory allocations (except pairing secret) needed for the secure channel are
    * performed here. The keypair used for the EC-DH algorithm is also generated here.
    */
-  public SecureChannel(byte pairingLimit, Crypto crypto, SECP256k1 secp256k1) {
+  public SecureChannel(byte pairingLimit, Crypto crypto) {
     this.crypto = crypto;
 
     scMac = Signature.getInstance(Signature.ALG_AES_MAC_128_NOPAD, false);

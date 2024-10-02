@@ -1,4 +1,4 @@
-package im.status.keycard;
+package so.keyring.card;
 
 import im.status.keycard.applet.SecureChannelSession;
 

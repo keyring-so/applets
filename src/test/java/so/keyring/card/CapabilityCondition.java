@@ -1,4 +1,4 @@
-package im.status.keycard;
+package so.keyring.card;
 
 import org.junit.jupiter.api.extension.ConditionEvaluationResult;
 import org.junit.jupiter.api.extension.ExecutionCondition;

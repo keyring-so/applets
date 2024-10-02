@@ -18,7 +18,7 @@ javacard {
 
   cap {
     aid = '0xA0:0x00:0x00:0x08:0x04:0x00:0x01'
-    packageName = 'im.status.keycard'
+    packageName = 'so.keyring.card'
     applet {
       aid = '0xA0:0x00:0x00:0x08:0x04:0x00:0x01:0x01'
       className = 'KeycardApplet'
@@ -39,12 +39,12 @@ javacard {
   }
 }
 
-def testTarget = project.properties['im.status.keycard.test.target']
+def testTarget = project.properties['so.keyring.card.test.target']
 if (!testTarget) {
   testTarget = 'card'
 }
 
-def pairingPass = project.properties['im.status.keycard.test.pairing']
+def pairingPass = project.properties['so.keyring.card.test.pairing']
 if (!pairingPass) {
   pairingPass = 'KeycardDefaultPairing'
 }
@@ -72,7 +72,7 @@ test {
   }
 }
 
-task install (type: im.status.keycard.build.InstallTask)
+task install (type: so.keyring.card.build.InstallTask)
 
 if (testTarget == 'card') {
   tasks.install.dependsOn(convertJavacard)
@@ -90,7 +90,7 @@ compileTestJava {
 }
 
 afterEvaluate {
-  def jvmArgs = ["-Dim.status.keycard.test.target=${testTarget}", "-Dim.status.keycard.test.pairing=${pairingPass}"]
+  def jvmArgs = ["-Dso.keyring.card.test.target=${testTarget}", "-Dso.keyring.so.test.pairing=${pairingPass}"]
 
   if (testTarget == 'simulator') {
     jvmArgs.push('-noverify')

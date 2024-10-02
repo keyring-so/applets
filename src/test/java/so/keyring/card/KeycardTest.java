@@ -1,11 +1,11 @@
-package im.status.keycard;
+package so.keyring.card;
 
 import com.licel.jcardsim.smartcardio.CardSimulator;
 import com.licel.jcardsim.smartcardio.CardTerminalSimulator;
 import com.licel.jcardsim.utils.AIDUtil;
 import im.status.keycard.applet.*;
 import im.status.keycard.applet.Certificate;
-import im.status.keycard.desktop.LedgerUSBManager;
+import im.status.keycard.LedgerUSBManager;
 import im.status.keycard.desktop.PCSCCardChannel;
 import im.status.keycard.io.APDUCommand;
 import im.status.keycard.io.APDUResponse;
@@ -55,7 +55,7 @@ public class KeycardTest {
   // Pairing key is KeycardTest
   private static CardTerminal cardTerminal;
   private static CardChannel apduChannel;
-  private static im.status.keycard.io.CardChannel sdkChannel;
+  private static so.keyring.card.io.CardChannel sdkChannel;
   private static CardSimulator simulator;
   private static KeyPair caKeyPair;
 
@@ -73,7 +73,7 @@ public class KeycardTest {
   private static final int TARGET;
 
   static {
-    switch(System.getProperty("im.status.keycard.test.target", "card")) {
+    switch(System.getProperty("so.keyring.card.test.target", "card")) {
       case "simulator":
         TARGET = TARGET_SIMULATOR;
         break;
@@ -201,7 +201,7 @@ public class KeycardTest {
   private static void openLedgerUSBChannel() {
     usbManager = new LedgerUSBManager(new CardListener() {
       @Override
-      public void onConnected(im.status.keycard.io.CardChannel channel) {
+      public void onConnected(so.keyring.card.io.CardChannel channel) {
         sdkChannel = channel;
       }
 
@@ -231,7 +231,7 @@ public class KeycardTest {
 
     initCapabilities(cmdSet.getApplicationInfo());
 
-    sharedSecret = cmdSet.pairingPasswordToSecret(System.getProperty("im.status.keycard.test.pairing", "KeycardDefaultPairing"));
+    sharedSecret = cmdSet.pairingPasswordToSecret(System.getProperty("so.keyring.card.test.pairing", "KeycardDefaultPairing"));
 
     if (!cmdSet.getApplicationInfo().isInitializedCard()) {
       initCard(cmdSet);
