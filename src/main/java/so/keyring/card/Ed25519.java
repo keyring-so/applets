@@ -1,9 +1,9 @@
-package im.status.keycard;
+package so.keyring.card;
 
 import javacard.framework.*;
 import javacard.security.*;
-import im.status.keycard.jcmathlib.*;
-import im.status.keycard.swalgs.*;
+import so.keyring.card.jcmathlib.*;
+import so.keyring.card.swalgs.*;
 
 public class Ed25519 {
     public final static boolean DEBUG = true;

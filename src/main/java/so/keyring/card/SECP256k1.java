@@ -1,4 +1,4 @@
-package im.status.keycard;
+package so.keyring.card;
 
 import javacard.security.ECKey;
 import javacard.security.ECPrivateKey;

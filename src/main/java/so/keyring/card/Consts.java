@@ -1,4 +1,4 @@
-package im.status.keycard;
+package so.keyring.card;
 
 public class Consts {
     public static final byte CLA_ED25519 = (byte) 0x00;

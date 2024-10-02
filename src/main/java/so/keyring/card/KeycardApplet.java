@@ -1,4 +1,4 @@
-package im.status.keycard;
+package so.keyring.card;
 
 import javacard.framework.*;
 import javacard.security.*;
