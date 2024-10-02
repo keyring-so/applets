@@ -1333,11 +1333,10 @@ public class KeycardApplet extends Applet {
     ed25519.setKeypair(privateKey);
     ed25519.signInit();
 
-    ed25519.signFinalize(apduBuffer, len, (short) (off + 32 + 32));
-    Util.arrayCopyNonAtomic(privateKey, (short) 0, apduBuffer, (short) off, (short) 32);
-    ed25519.copyPubkey(apduBuffer, (short)(off+32));
+    ed25519.signFinalize(apduBuffer, len, (short) (off + 32));
+    ed25519.copyPubkey(apduBuffer, (short)(off));
 
-    short outLen = (short) (PUBLIC_KEY_SIZE + PRIVATE_KEY_SIZE +  ed25519.curve.COORD_SIZE + ed25519.curve.COORD_SIZE);
+    short outLen = (short) (PUBLIC_KEY_SIZE +  ed25519.curve.COORD_SIZE + ed25519.curve.COORD_SIZE);
 
     if (makeCurrent) {
       commitTmpPath();

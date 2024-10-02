@@ -1,35 +1,13 @@
-# What is Keycard?
+# Keyring Applets
 
-Keycard is an implementation of a BIP-32 HD wallet running on Javacard 3.0.4+ (see implementation notes)
+Hardware wallet running on Javacard 3.0.4+ (see implementation notes)
 
 It supports among others
 - key generation, derivation and signing
-- exporting keys defined in the context of EIP-1581 https://eips.ethereum.org/EIPS/eip-1581
-- setting up a NFC NDEF tag
+- BIP32, BIP39, BIP44, SLIP-10 for ED25519
 
-Communication with the Keycard happens through a simple APDU interface, together with a Secure Channel guaranteeing confidentiality, authentication and integrity of all commands. It supports both NFC and ISO7816 physical interfaces, meaning that it is compatible with any Android phone equipped with NFC, and all USB Smartcard readers.
+Communication with the card happens through a simple APDU interface, together with a Secure Channel guaranteeing confidentiality, authentication and integrity of all commands. It supports both NFC and ISO7816 physical interfaces, meaning that it is compatible with any Android phone equipped with NFC, and all USB Smartcard readers.
 
-The most obvious case for integration of Keycard is crypto wallets (ETH, BTC, etc), however it can be used in other systems where a BIP-32 key tree is used and/or you perform authentication/identification.
-
-# Where to start?
-
-A good place to start is our documentation site https://keycard.tech/docs/
-
-You can also join the dicussion about this project on Status channel: https://get.status.im/chat/public/status-keycard
-
-If you just want to use the Keycard as your hardware wallet there are currently three apps supporting it
-
-1. Status [[Android](https://play.google.com/store/apps/details?id=im.status.ethereum)][[iOS](https://apps.apple.com/us/app/status-private-communication/id1178893006)]
-2. WallETH [[Android](https://play.google.com/store/apps/details?id=org.walleth)]
-3. Enno Walet https://ennowallet.com/
-
-# How to contribute? 
-
-Anyone is welcome to contribute to Keycard! 
-
-Most of our communication about the project is going on here: https://get.status.im/chat/public/status-keycard
-
-Should you wish to work on an issue, please claim it first by commenting on the GitHub issue that you want to work on it. This is to prevent duplicated efforts from contributors on the same issue.
 
 # How to build the project?
 
@@ -83,11 +61,3 @@ The algorithms the card must support are at least:
 
 Best performance is achieved if the card supports:
 * Signature.ALG_HMAC_SHA_512
-
-# Other related repositories
-
-Java SDK for Android and Desktop https://github.com/status-im/status-keycard-java
-
-Swift SDK for iOS13 and above https://github.com/status-im/Keycard.swift
-
-Keycard CLI for Desktop https://github.com/status-im/keycard-cli
